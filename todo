@@ -1,0 +1,3 @@
+do dataset class that contains method to get instance from:
+- yahoo_finance
+- datasets downloaded from benchmark (get datasets from websites or paper github)
