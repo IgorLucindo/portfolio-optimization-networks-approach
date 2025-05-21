@@ -11,7 +11,7 @@ def save_results(results, save_flag=False):
     if not save_flag:
         return
     
-    results_path = "projects/portifolio-optimization-networks-approach/results"
+    results_path = "application/results"
     os.makedirs(results_path, exist_ok=True)
 
     # Create dataframe for exporting to xlsx file

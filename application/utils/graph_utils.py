@@ -6,7 +6,8 @@ def get_financial_correlation_graph(instance, threshold=0.5):
     """
     Returns an undirected graph representing correlated financial assets
     """
-    assets, mean, correlation_matrix, sigma, asset_pairs = instance
+    (assets, daily_returns, min_daily_return, mean_return,
+     correlation_matrix, sigma, asset_pairs, total_days) = instance
     
     # Create graph
     G = nx.Graph()
@@ -21,6 +22,27 @@ def get_financial_correlation_graph(instance, threshold=0.5):
     G.add_edges_from(edges_to_add)
 
     return G
+
+
+def power_graph(G, k):
+    """
+    Return k-th power of a graph
+    """
+    edges_to_add = set()
+    vertices = list(G.nodes)
+
+    for u in vertices:
+        lengths = nx.single_source_shortest_path_length(G, u, cutoff=k)
+        for v in lengths:
+            if u != v:
+                edge = tuple(sorted([u, v]))
+                edges_to_add.add(edge)
+
+    G_power = nx.Graph()
+    G_power.add_nodes_from(vertices)
+    G_power.add_edges_from(edges_to_add)
+
+    return G_power
 
 
 def show_graphs(graphs, plot_flag=True):
