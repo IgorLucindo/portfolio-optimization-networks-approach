@@ -1,21 +1,24 @@
 from classes.Dataset import *
+from classes.Timer import *
+from classes.Results import *
 from utils.instance_utils import *
 from utils.graph_utils import *
-from utils.solve_utils import *
-from utils.results_utils import *
+from utils.solve.mip_utils import *
 
 
 # Set parameter flags
 flags = {
     'plot': False,
     'plot_results': False,
-    'save': True
+    'print_diagnosis': True,
+    'save_results': True
 }
 
 
 def main():
     # Get dataset
-    dt = Dataset("yahoo_finance")
+    dt = Dataset("l")
+    results = Results(flags)
 
     # Get instances
     instances = get_instances(dt.prices_dict)
@@ -24,7 +27,8 @@ def main():
     # thresholds = [0.3, 0.4, 0.5, 0.6, 0.7]
     thresholds = [0.4]
 
-    results = []
+    # Create Timer class after loading instances
+    timer = Timer()
 
     for instance in instances:
         for t in thresholds:
@@ -33,15 +37,20 @@ def main():
             G2 = power_graph(G, 2)
 
             # Solve optimal portifolio for different betas
-            results.append(solve_max_return(G2, instance))
+            results.data.append(solve_max_return(G2, instance))
+            timer.update()
 
             # Show graphs
             show_graphs([G], flags['plot'])
-        results.append(["", "", "", ""])
+        results.data.append(["", "", "", ""])
+
     
+    # Print results
+    results.print(timer.total_runtime)
+    # Plot results
+    results.plot()
     # Save results
-    save_results(results, flags['save'])
-    plot_results(results, flags['plot_results'])
+    results.save()
 
 
 if __name__ == "__main__":
