@@ -1,5 +1,6 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import networkx as nx
+import pandas as pd
 import numpy as np
 import sys
 import os
@@ -15,6 +16,34 @@ class Results:
 
         # Create results folder
         os.makedirs('application/results', exist_ok=True)
+
+
+    def set_data(self, t, G, instance, solution):
+        """
+        Return optimal portifolio, expected return, portfolio variance, average correlation
+        """
+        (assets, daily_returns, min_daily_return, mean_return,
+        correlation_matrix, sigma, asset_pairs, total_days) = instance
+        x, selected_indices = solution
+
+        # Optimal portifolio
+        portifolio = [assets[i] for i in selected_indices]
+
+        # Expected return
+        expected_return = sum(x[i] * mean_return[i] for i in G.nodes)
+
+        # Portfolio variance
+        variance = sum(x[i] * sigma[i, j] * x[j] for i in G.nodes for j in G.nodes)
+
+        # Average correlation
+        pairs = {(i, j) for idx, i in enumerate(selected_indices) for j in selected_indices[idx + 1:]}
+        avg_corr = np.mean([abs(correlation_matrix[i, j]) for i, j in pairs]) if pairs else 0
+
+        self.data.append([t, nx.density(G), portifolio, len(portifolio), expected_return, variance, avg_corr])
+
+
+    def set_data_instance_name(self, instance_name):
+        self.data.append([instance_name, "", "", "", "", "", ""])
 
 
     def print(self, total_runtime):
@@ -86,5 +115,5 @@ class Results:
             return
         
         # Create dataframe for exporting to xlsx file
-        df = pd.DataFrame(self.data, columns=["Portifolio", "Expected Return", "Portifolio Variance", "Average Correlation"])
+        df = pd.DataFrame(self.data, columns=["Threshold", "Density", "Portifolio", "#Portifolio", "Expected Return", "Portifolio Variance", "Average Correlation"])
         df.to_excel(os.path.join("application/results", "results.xlsx"), index=False)

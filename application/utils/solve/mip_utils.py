@@ -1,4 +1,3 @@
-from utils.calculation_utils import *
 import gurobipy as gp
 from gurobipy import GRB
 import networkx as nx
@@ -6,8 +5,7 @@ import networkx as nx
 
 def solve_max_return(G, instance, delta=0.5, R_var=0.001, gamma=0.05):
     """
-    MIP formulation for maximum independent set with min correlation
-    Return optimal portifolio and average_corr
+    MIP formulation for maximum mean return
     """
     (assets, daily_returns, min_daily_return, mean_return,
      correlation_matrix, sigma, asset_pairs, total_days) = instance
@@ -43,4 +41,7 @@ def solve_max_return(G, instance, delta=0.5, R_var=0.001, gamma=0.05):
     # Solve
     model.optimize()
 
-    return extract_output(G, instance, x)
+    weights = [x[i].X for i in G.nodes]
+    selected_indices = [i for i in G.nodes if y[i].X > 0.5]
+    
+    return weights, selected_indices

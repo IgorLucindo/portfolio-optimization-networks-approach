@@ -2,9 +2,9 @@ import numpy as np
 
 
 def get_instances(prices_dict):
-    instances = []
+    instances = {}
 
-    for assets, prices in prices_dict.values():
+    for asset_type, (assets, prices) in prices_dict.items():
         n = len(assets)
 
         # Compute parameters for instance
@@ -17,9 +17,9 @@ def get_instances(prices_dict):
         total_days = len(daily_returns)
 
         # Append to instances
-        instances.append((
+        instances[asset_type] = (
             assets, daily_returns, min_daily_return, mean_return,
             correlation_matrix, sigma, asset_pairs, total_days
-        ))
+        )
 
     return instances

@@ -45,7 +45,7 @@ class Dataset:
                 assets_dict["cryptos"] = ["BTC-USD", "ETH-USD", "BNB-USD", "SOL-USD", "XRP-USD", "ADA-USD", "DOGE-USD", "AVAX-USD", "TON11419-USD", "SHIB-USD", "DOT-USD", "TRX-USD", "LINK-USD", "MATIC-USD", "BCH-USD", "LTC-USD", "UNI7083-USD", "ICP-USD", "NEAR-USD", "ETC-USD", "XLM-USD", "APT21794-USD", "IMX10603-USD", "FIL-USD", "INJ-USD", "HBAR-USD", "VET-USD", "MKR-USD", "ARB11841-USD", "QNT-USD", "RUNE-USD", "LDO-USD", "AAVE-USD", "EGLD-USD", "STX-USD", "SAND-USD", "AXS-USD", "XTZ-USD", "KAS-USD", "XMR-USD", "THETA-USD", "SNX-USD", "MANA-USD", "CRV-USD", "CHZ-USD", "ZEC-USD", "ENS-USD", "DYDX-USD"]
             case "l":
                 df = pd.read_excel(self.datasets_path + "/tickers.xlsx")
-                assets_dict["stocks"] = df['STOCKS'].dropna().astype(str).tolist()
+                assets_dict["stocks_5000"] = df['STOCKS'].dropna().astype(str).tolist()
                 # assets_dict["etfs"] = df['ETF'].dropna().astype(str).tolist()
 
         return assets_dict
@@ -59,7 +59,8 @@ class Dataset:
 
         if os.path.exists(asset_path):
             price_data = pd.read_csv(asset_path, index_col=0, parse_dates=True)
-            price_data = price_data.iloc[:, :200]
+            cols = list(range(0, 188)) + list(range(188, 900))
+            price_data = price_data.iloc[:, cols]
             assets = price_data.iloc[0].dropna().index.tolist()
         else:
             price_data = yf.download(assets, start=date_range[0], end=date_range[1])["Close"]
