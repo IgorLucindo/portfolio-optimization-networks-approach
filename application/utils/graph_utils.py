@@ -45,6 +45,14 @@ def power_graph(G, k):
     return G_power
 
 
+def remove_negative_return_vertices(G, mean_return):
+    """
+    Remove vertices that correspond to assets with negative mean return
+    """
+    vertices_to_remove = [i for i in G.nodes if mean_return[i] < 0]
+    G.remove_nodes_from(vertices_to_remove)
+
+
 def show_graphs(graphs, plot_flag=True):
     """
     Plot graphs with faint edges and no labels.

@@ -3,7 +3,7 @@ from classes.Timer import *
 from classes.Results import *
 from utils.instance_utils import *
 from utils.graph_utils import *
-from utils.solve.mip_utils import *
+from utils.solve_utils import *
 
 
 # Set parameter flags
@@ -34,15 +34,19 @@ def main():
         results.set_data_instance_name(instance_name)
 
         for t in thresholds:
+            timer.reset()
+
             # Create graph based on instance
             G = get_financial_correlation_graph(instance, t)
             G2 = power_graph(G, 2)
-            print(G2.degree[187])
+            remove_negative_return_vertices(G2, instance[3])
 
             # Solve optimal portifolio for different betas
             solution = solve_max_return(G2, instance)
-            results.set_data(t, G2, instance, solution)
+            timer.mark()
             timer.update()
+
+            results.set_data(t, G2, instance, solution, timer.instance_runtimes[0])
 
             # Show graphs
             show_graphs([G], flags['plot'])
