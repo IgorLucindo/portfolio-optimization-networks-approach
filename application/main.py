@@ -26,6 +26,8 @@ def main():
     # Set parameters
     # thresholds = [0.3, 0.4, 0.5, 0.6, 0.7]
     thresholds = [0.4]
+    deltas = [0.64, 0.66, 0.7, 0.8]
+    R_var = 0.01
 
     # Create Timer class after loading instances
     timer = Timer()
@@ -34,19 +36,22 @@ def main():
         results.set_data_instance_name(instance_name)
 
         for t in thresholds:
-            timer.reset()
-
             # Create graph based on instance
             G = get_financial_correlation_graph(instance, t)
             G2 = power_graph(G, 2)
             remove_negative_return_vertices(G2, instance[3])
 
-            # Solve optimal portifolio for different betas
-            solution = solve_max_return(G2, instance)
-            timer.mark()
-            timer.update()
+            for delta in deltas:
+                timer.reset()
+                # Solve optimal portifolio
+                # solution = solve_max_return(G2, instance, delta, R_var)
+                solution = solve_max_return_cb(G2, instance, delta, R_var)
+                # solution = solve_max_return_cb2(G2, instance, delta, R_var)
+                timer.mark()
+                timer.update()
 
-            results.set_data(t, G2, instance, solution, timer.instance_runtimes[0])
+                # Set results
+                results.set_data(t, G2, instance, solution, timer.instance_runtimes[0])
 
             # Show graphs
             show_graphs([G], flags['plot'])
