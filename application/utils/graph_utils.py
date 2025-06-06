@@ -2,9 +2,20 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 
-def get_financial_correlation_graph(instance, threshold=0.5):
+def get_correlation_power_graph(instance, t):
     """
-    Returns an undirected graph representing correlated financial assets
+    Return an undirected power graph representing correlated assets
+    """
+    G = get_correlation_graph(instance, t)
+    G2 = power_graph(G, 2)
+    remove_negative_return_vertices(G2, instance[3])
+
+    return G2
+
+
+def get_correlation_graph(instance, threshold=0.5):
+    """
+    Returns an undirected graph representing correlated assets
     """
     (assets, daily_returns, min_daily_return, mean_return,
      correlation_matrix, sigma, asset_pairs, total_days) = instance

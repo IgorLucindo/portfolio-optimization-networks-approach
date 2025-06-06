@@ -59,7 +59,7 @@ class Dataset:
 
         if os.path.exists(asset_path):
             price_data = pd.read_csv(asset_path, index_col=0, parse_dates=True)
-            cols = range(0, 1150)
+            cols = range(0, 1500)
             price_data = price_data.iloc[:, cols]
             assets = price_data.iloc[0].dropna().index.tolist()
         else:

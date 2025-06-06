@@ -1,0 +1,4 @@
+Do results testing callbacks:
+    - with inequality delta contraint
+    - with equality delta contraint
+    - with best of each inequality and equality
