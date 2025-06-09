@@ -8,9 +8,10 @@ def get_correlation_power_graph(instance, t):
     """
     G = get_correlation_graph(instance, t)
     G2 = power_graph(G, 2)
+    remove_negative_return_vertices(G, instance[3])
     remove_negative_return_vertices(G2, instance[3])
 
-    return G2
+    return G, G2
 
 
 def get_correlation_graph(instance, threshold=0.5):

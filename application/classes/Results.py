@@ -27,17 +27,14 @@ class Results:
         (assets, daily_returns, min_daily_return, mean_return,
         correlation_matrix, sigma, asset_pairs, total_days) = instance
 
-        for k, (x, selected_indices) in enumerate(solutions):
+        for k, (x, selected_indices, obj_val, obj_bound) in enumerate(solutions):
             # Handle infeasibility
             if not len(x):
-                self.data[k].append([t, delta, nx.density(G), selected_indices, "-", "-", "-", "-", runtimes[k]])
+                self.data[k].append([t, delta, nx.density(G), selected_indices, "-", obj_val, obj_bound, "-", "-", runtimes[k]])
                 continue
 
             # Optimal portifolio
             portifolio = [assets[i] for i in selected_indices]
-
-            # Expected return
-            expected_return = sum(x[i] * mean_return[i] for i in G.nodes)
 
             # Portfolio variance
             variance = sum(x[i] * sigma[i, j] * x[j] for i in G.nodes for j in G.nodes)
@@ -47,7 +44,7 @@ class Results:
             avg_corr = np.mean([abs(correlation_matrix[i, j]) for i, j in pairs]) if pairs else 0
 
             self.data[k].append([t, delta, nx.density(G), portifolio, len(portifolio),
-                                 expected_return, variance, avg_corr, runtimes[k]])
+                                 obj_val, "-", variance, avg_corr, runtimes[k]])
 
 
     def set_save_data(self, instance_name, num_of_assets):
@@ -56,10 +53,10 @@ class Results:
         """
         table_names = ["No Callback", "Callback 1", "Callback 2"]
 
-        self.save_data.append([instance_name + f"({num_of_assets} assets)", "", "", "", "", "", "", "", ""])
+        self.save_data.append([instance_name + f"({num_of_assets} assets)", "", "", "", "", "", "", "", "", ""])
 
         for k, data in self.data.items():
-            self.save_data.append([table_names[k], "", "", "", "", "", "", "", ""])
+            self.save_data.append([table_names[k], "", "", "", "", "", "", "", "", ""])
             self.save_data.extend(data)
 
 
@@ -131,8 +128,8 @@ class Results:
         if not self.flags['save_results']:
             return
         
-        columns = ["Threshold", "Delta", "Density", "Portifolio", "#Portifolio",
-                   "Expected Return", "Portifolio Variance", "Average Correlation", "Runtime (s)"]
+        columns = ["Threshold", "Delta", "Density", "Portifolio", "#Portifolio", "Expected Return", 
+                   "Expected Return (Bound)", "Portifolio Variance", "Average Correlation", "Runtime (s)"]
         
         # Create dataframe for exporting to xlsx file
         df = pd.DataFrame(self.save_data, columns=columns)

@@ -7,15 +7,16 @@ class Dataset:
     """
     Class for getting instance from dataset of assets
     """
-    def __init__(self, dataset_name):
+    def __init__(self, config):
         # Set dataset path
         datasets_paths = {
             "m": "datasets/yahoo_finance/m",
             "l": "datasets/yahoo_finance/l"
         }
-        self.dataset_name = dataset_name
-        self.datasets_path = datasets_paths[dataset_name]
+        self.dataset_name = config['dataset_name']
+        self.datasets_path = datasets_paths[self.dataset_name]
         os.makedirs(self.datasets_path, exist_ok=True)
+        self.max_num_of_assets = config['max_num_of_assets']
 
         # Get daily prices from chosen dataset
         self.prices_dict = self._get_financial_assets()
@@ -59,7 +60,7 @@ class Dataset:
 
         if os.path.exists(asset_path):
             price_data = pd.read_csv(asset_path, index_col=0, parse_dates=True)
-            cols = range(0, 1500)
+            cols = range(0, self.max_num_of_assets)
             price_data = price_data.iloc[:, cols]
             assets = price_data.iloc[0].dropna().index.tolist()
         else:
