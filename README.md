@@ -13,7 +13,7 @@ pip install -r requirements.txt
 ```
 
 Next step, download the benchmarks for daily returns for different types of assets:
---link--
+https://drive.google.com/drive/u/0/folders/1qB7EPcQBpS5uUhjGjRBzYcI83eilb-Td
 
 Extract the folder and move it to ``dataset`` folder.
 

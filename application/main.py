@@ -5,6 +5,7 @@ from utils.instance_utils import *
 from utils.graph_utils import *
 from utils.solve_utils import *
 
+
 # Set parameter flags
 flags = {
     'plot': False,
