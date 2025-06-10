@@ -59,6 +59,18 @@ class Results:
             self.save_data.append([table_names[k], "", "", "", "", "", "", "", "", ""])
             self.save_data.extend(data)
 
+        self.data = defaultdict(list)
+
+    def set_save_data_config(self, config):
+        """
+        Set configuration for saving
+        """
+        for _ in range(3):
+            self.save_data.append(["", "", "", "", "", "", "", "", "", ""])
+
+        for key, value in config.items():
+            self.save_data.append([key, value, "", "", "", "", "", "", "", ""])
+
 
     def print(self, total_runtime):
         """
