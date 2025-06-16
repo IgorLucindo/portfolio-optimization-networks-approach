@@ -1,6 +1,1 @@
-Do results testing callbacks:
-    - with inequality delta contraint
-    - with equality delta contraint
-    - with best of each inequality and equality
-
-Vary deltas from infeasible solution to trivial solution
+test iterative_warmstart but instead of 1 and 2, think of a way to go from 1 until a stop condition that gives the solution

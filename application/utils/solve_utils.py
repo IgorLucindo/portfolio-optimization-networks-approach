@@ -2,12 +2,23 @@ import gurobipy as gp
 from gurobipy import GRB
 from datetime import datetime
 import math
+import time
 import os
 
 
 def solve_max_return(G, cliques, instance, config, flags, delta=0.65, callback=0):
     """
-    MIP formulation for maximum mean return
+    Solve for maximum mean return, different methods depending on config
+    """
+    if config['iterative_warmstart']:
+        return _solve_iterative(G, cliques, instance, config, flags, delta, callback)
+    else:
+        return _solve(G, cliques, instance, config, flags, delta, callback)
+
+
+def _solve(G, cliques, instance, config, flags, delta, callback, numOfselectedAssets=0, solution=None):
+    """
+    Solve for maximum mean return
     """
     # Unpack instance data
     (assets, daily_returns, min_daily_return, mean_return,
@@ -33,6 +44,13 @@ def solve_max_return(G, cliques, instance, config, flags, delta=0.65, callback=0
     x = model.addVars(V, vtype=GRB.CONTINUOUS, name="x")
     y = model.addVars(V, vtype=GRB.BINARY, name="y")
     z = model.addVars(T_range, vtype=GRB.BINARY, name="z")
+
+    # Set starting values
+    if solution:
+        _weights, _selected_indices, _objVal, _ = solution
+        for i in _selected_indices:
+            x[i].Start = _weights[i]
+            y[i].Start = 1
 
 
     # Set objective function
@@ -74,6 +92,9 @@ def solve_max_return(G, cliques, instance, config, flags, delta=0.65, callback=0
     if config['valid_day_constr'] == 'upfront':
         model.addConstrs((gp.quicksum(y[i] for i in S[t]) >= 1 - z[t] for t in T_range), name="c7")
 
+    if numOfselectedAssets:
+        model.addConstr(gp.quicksum(y[i] for i in V) == numOfselectedAssets, name="c8")
+
 
     # Define callback functions
     def lazy_callback1(model, where):
@@ -108,7 +129,6 @@ def solve_max_return(G, cliques, instance, config, flags, delta=0.65, callback=0
                 model.cbLazy(gp.quicksum(daily_returns[t, i] * x[i] for i in V) >=
                              R_var - (R_var - min_daily_return[t]) * z[t])
     
-
     # Solve
     match callback:
         case 0:
@@ -128,9 +148,9 @@ def solve_max_return(G, cliques, instance, config, flags, delta=0.65, callback=0
     return weights, selected_indices, model.ObjVal, None
 
 
-def solve_max_return_unconstrained(V, instance, delta=0.65, R_var=0.01):
+def _solve_unconstrained(V, instance, delta, R_var):
     """
-    MIP formulation for maximum mean return
+    Solve maximum mean return
     """
     (assets, daily_returns, min_daily_return, mean_return,
      correlation_matrix, sigma, asset_pairs, total_days) = instance
@@ -175,6 +195,21 @@ def solve_max_return_unconstrained(V, instance, delta=0.65, R_var=0.01):
         solutions.append([model.ObjVal, [z[t].X for t in T_range]])
     
     return solutions
+
+
+def _solve_iterative(G, cliques, instance, config, flags, delta, callback):
+    """
+    Solve the asset allocation problem using an iterative warm-start strategy
+    """
+    solution = None
+    timestamps = []
+    for k in range(1, 3):
+        start_time = time.time()
+        solution = _solve(G, cliques, instance, config, flags, delta, callback, k, solution)
+        timestamps.append(time.time() - start_time)
+    print(timestamps)
+
+    return _solve(G, cliques, instance, config, flags, delta, callback, solution=solution)
 
 
 def _save_log(model, save_flag):
