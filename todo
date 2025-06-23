@@ -1,1 +1,2 @@
-test iterative_warmstart but instead of 1 and 2, think of a way to go from 1 until a stop condition that gives the solution
+Add to paper:
+    Compare warmstart with first feasible solution of gurobi
