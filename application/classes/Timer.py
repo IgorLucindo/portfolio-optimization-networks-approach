@@ -38,4 +38,4 @@ class Timer:
         minutes = int((total_seconds % 3600) // 60)
         seconds = round(total_seconds % 60, 1)
 
-        return f"{hours}h " if hours else "" + f"{minutes}min " if minutes else "" + f"{seconds}s"
+        return (f"{hours}h " if hours else "") + (f"{minutes}min " if minutes else "") + f"{seconds}s"

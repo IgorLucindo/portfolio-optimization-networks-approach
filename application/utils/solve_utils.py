@@ -17,7 +17,7 @@ def solve_max_return(G, cliques, instance, config, flags, delta=0.65, callback=0
         return _solve(G, cliques, instance, config, flags, delta, callback)
 
 
-def _solve(G, cliques, instance, config, flags, delta, callback, numOfselectedAssets=0, solution={'solved': False}):
+def _solve(G, cliques, instance, config, flags, delta, callback, numOfselectedAssets=0, solution={}):
     """
     Solve for maximum mean return
     """
@@ -53,7 +53,7 @@ def _solve(G, cliques, instance, config, flags, delta, callback, numOfselectedAs
 
 
     # Set warmstart
-    if solution['solved']:
+    if 'x' in solution:
         for i in solution['selected_idx']:
             x[i].Start = solution['x'][i]
             y[i].Start = 1
@@ -171,7 +171,7 @@ def _solve_iterative(G, cliques, instance, config, flags, delta, callback):
     Solve the asset allocation problem using an iterative warm-start strategy
     """
     solutions = []
-    best_solution = {'solved': False, 'obj_val': 0}
+    best_solution = {'obj_val': float('-inf')}
     upper_bounds = [0]
     max_num_of_assets = _solve_max_num_of_assets(G, config)
     _timer = Timer()
@@ -189,26 +189,24 @@ def _solve_iterative(G, cliques, instance, config, flags, delta, callback):
     for k in range(1, max_num_of_assets+1):
         # Solve iteration
         if upper_bounds[k-1] < best_solution['obj_val']:
-            # Set solution
-            solutions.append({'solved': True, 'obj_bound': upper_bounds[k-1]})
-            continue
-        solutions.append(_solve(G, cliques, instance, config_iter, flags, delta, callback, k, best_solution))
+            current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1]}
+        else:
+            current_solution = _solve(G, cliques, instance, config_iter, flags, delta, callback, k, best_solution)
         _timer.mark()
 
-        # Update current best solution
-        if solutions[-1].get('obj_val', 0) > best_solution['obj_val']:
-            best_solution = solutions[-1]
+        # Update solutions and current best solution
+        solutions.append(current_solution)
+        best_solution = _get_best_solution(best_solution, current_solution, k)
     _timer.update()
+
+    # Update solution unsolved cases
+    solutions = _update_solutions(best_solution, solutions)
 
     # Solve unsolved cases
     # solution = _solve(G, cliques, instance, config, flags, delta, callback, solution=solution)
 
     # Set iteration warmstart results to solution
-    best_solution['obj_vals'] = [d.get('obj_val', "-") for d in solutions]
-    best_solution['obj_bounds'] = [d.get('obj_bound', "-") for d in solutions]
-    best_solution['solved_iters'] = [d['solved'] for d in solutions]
-    best_solution['iter_runtimes'] = _timer.instance_runtimes
-    best_solution['status'] = "-"
+    best_solution = _set_iter_results(best_solution, solutions, _timer)
 
     return best_solution
 
@@ -261,6 +259,42 @@ def _solve_ub(instance, config, numOfselectedAssets):
 
     # The dot product gives the objective value for this ideal, unconstrained portfolio.
     return weights.dot(top_k_returns)
+
+
+def _get_best_solution(best_solution, current_solution, k):
+    """
+    Compare current solution to best solution and update
+    """
+    if current_solution.get('obj_val', float('-inf')) > best_solution['obj_val']:
+        best_solution = current_solution
+        best_solution['idx'] = k
+        
+    return best_solution
+
+
+def _update_solutions(solution, solutions):
+    """
+    Update solutions unsolved cases
+    """
+    for d in solutions:
+        if not d['solved'] and solution['obj_val'] >= d['obj_bound']:
+            d['solved'] = True
+
+    return solutions
+
+
+
+def _set_iter_results(solution, solutions, timer):
+    """
+    Set iteration warmstart results to solution
+    """
+    solution['obj_vals'] = [d.get('obj_val', "-") for d in solutions]
+    solution['obj_bounds'] = [d.get('obj_bound', "-") for d in solutions]
+    solution['solved_iters'] = [d['solved'] for d in solutions]
+    solution['iter_runtimes'] = timer.instance_runtimes
+    solution['status'] = "-"
+
+    return solution
 
 
 def _save_log(model, save_flag):

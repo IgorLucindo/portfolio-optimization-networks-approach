@@ -48,8 +48,8 @@ class Results:
          correlation_matrix, sigma, asset_pairs, total_days) = instance
 
         for k, solution in enumerate(solutions):
-            keys = ['x', 'selected_idx', 'obj_val', 'obj_bound', 'status', 'obj_vals', 'obj_bounds', 'solved_iters', 'iter_runtimes']
-            x, selected_idx, obj_val, obj_bound, status, obj_vals, obj_bounds, solved_iters, iter_runtimes = (solution.get(k, "-") for k in keys)
+            keys = ['x', 'selected_idx', 'obj_val', 'obj_bound', 'status', 'obj_vals', 'obj_bounds', 'solved_iters', 'iter_runtimes', 'idx']
+            x, selected_idx, obj_val, obj_bound, status, obj_vals, obj_bounds, solved_iters, iter_runtimes, best_idx = (solution.get(k, "-") for k in keys)
 
             # Optimal portifolio
             portifolio = [assets[i] for i in selected_idx]
@@ -69,6 +69,9 @@ class Results:
 
             # --- Iteration warmstart method ---
             if self.config['iterative_warmstart']:
+                # Best objective value
+                obj_val = {(best_idx+1): round(obj_val, 4)}
+
                 # Solved cases percentage
                 solved_iters_percentage = sum(solved_iters) / len(solved_iters) * 100
 
