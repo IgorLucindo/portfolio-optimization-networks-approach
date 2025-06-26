@@ -22,16 +22,16 @@ config = {
     # 'thresholds': [0.3, 0.4, 0.5, 0.6, 0.7],
     'thresholds': [0.4],
     # 'deltas': [0.55, 0.6, 0.65, 0.7, 0.75],
-    'deltas': [0.05],
-    # 'deltas': [0.6],
-    'R_var': -0.01,
-    # 'R_var': 0.01,
+    # 'deltas': [0.05],
+    'deltas': [0.6],
+    # 'R_var': -0.01,
+    'R_var': 0.01,
     'gamma': 0.05,
     'time_limit': 7200,
     'dist_constr': 'star',       # 'clique' or 'star'
     'valid_day_constr': 'none',    # 'none', 'upfront' or 'callback'
     'delta_constr': 'inequality',   # 'equality' or 'inequality
-    'iterative_warmstart': True
+    'iterative_warmstart': False
 }
 
 
