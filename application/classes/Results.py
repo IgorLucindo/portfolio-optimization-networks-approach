@@ -28,7 +28,7 @@ class Results:
         self.save_iters_collumns = [
             "Partition", "Best ObjVal", "ObjVals", "#Solved Iterations (%)",
             "Unsolved Cases", "ObjVals (unsolved)", "ObjBounds (unsolved)",
-            "Gaps (%) (unsolved)", "Runtimes (s)"
+            "Gaps (%) (unsolved)", "Runtimes (s)", "Total Runtime (s)"
         ]
         self.row_length = [
             len(self.save_solution_collumns),
@@ -70,7 +70,7 @@ class Results:
             # --- Iteration warmstart method ---
             if self.config['iterative_warmstart']:
                 # Best objective value
-                obj_val = {(best_idx+1): round(obj_val, 4)}
+                obj_val = {best_idx: round(obj_val, 4)}
 
                 # Solved cases percentage
                 solved_iters_percentage = sum(solved_iters) / len(solved_iters) * 100
@@ -100,7 +100,7 @@ class Results:
                 self.iters_data[k].append([
                     partition_name, obj_val, obj_vals, solved_iters_percentage,
                     unsolved_cases, obj_vals_unsolved, obj_bounds_unsolved,
-                    gaps_unsolved, iter_runtimes
+                    gaps_unsolved, iter_runtimes, runtimes[k]
                 ])
 
 

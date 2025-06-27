@@ -16,7 +16,6 @@ class Timer:
     def update(self):
         # Update instance runtimes
         self.instance_runtimes = np.diff(self.timestamps)
-        self.instance_runtimes = [self.format_time(s) for s in self.instance_runtimes]
 
         # Update total runtime
         self.total_runtime = time.time() - self.start_time
@@ -28,14 +27,3 @@ class Timer:
 
     def mark(self):
         self.timestamps.append(time.time())
-
-
-    def format_time(self, total_seconds):
-        """
-        Format time in a readable way
-        """
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        seconds = round(total_seconds % 60, 1)
-
-        return (f"{hours}h " if hours else "") + (f"{minutes}min " if minutes else "") + f"{seconds}s"
