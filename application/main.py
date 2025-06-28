@@ -18,7 +18,7 @@ flags = {
 # Set configuration
 config = {
     'dataset_name': 'l',           # 'm' or 'l'
-    'assets': {'range': 500, '#partitions': 10},
+    'assets': {'range': 500, '#partitions': 1},
     # 'thresholds': [0.3, 0.4, 0.5, 0.6, 0.7],
     'thresholds': [0.4],
     # 'deltas': [0.55, 0.6, 0.65, 0.7, 0.75],
@@ -31,7 +31,7 @@ config = {
     'dist_constr': 'star',       # 'clique' or 'star'
     'valid_day_constr': 'none',    # 'none', 'upfront' or 'callback'
     'delta_constr': 'inequality',   # 'equality' or 'inequality
-    'iterative_warmstart': False
+    'iterative_warmstart': True
 }
 
 
@@ -66,7 +66,7 @@ def main():
                     timer.update()
 
                     # Set results
-                    results.set_data(solutions, partition_name, t, delta, G, instance, timer.instance_runtimes)
+                    results.set_data(solutions, partition_name, t, delta, G, instance, timer.runtimes)
 
                 # Show graphs
                 show_graphs([G2], flags['plot'])

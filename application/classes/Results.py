@@ -1,3 +1,4 @@
+from utils.calculation_utils import *
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -28,7 +29,7 @@ class Results:
         self.save_iters_collumns = [
             "Partition", "Best ObjVal", "ObjVals", "#Solved Iterations (%)",
             "Unsolved Cases", "ObjVals (unsolved)", "ObjBounds (unsolved)",
-            "Gaps (%) (unsolved)", "Runtimes (s)", "Total Runtime (s)"
+            "Gaps (%) (unsolved)", "Runtimes (s)", "Loop Runtime (s)", "Total Runtime (s)"
         ]
         self.row_length = [
             len(self.save_solution_collumns),
@@ -48,8 +49,10 @@ class Results:
          correlation_matrix, sigma, asset_pairs, total_days) = instance
 
         for k, solution in enumerate(solutions):
-            keys = ['x', 'selected_idx', 'obj_val', 'obj_bound', 'status', 'obj_vals', 'obj_bounds', 'solved_iters', 'iter_runtimes', 'idx']
-            x, selected_idx, obj_val, obj_bound, status, obj_vals, obj_bounds, solved_iters, iter_runtimes, best_idx = (solution.get(k, "-") for k in keys)
+            keys = ['x', 'selected_idx', 'obj_val', 'obj_bound', 'status']
+            keys_iter = ['obj_vals', 'obj_bounds', 'solved_iters', 'iter_runtimes', 'loop_runtimes', 'best_idx']
+            x, selected_idx, obj_val, obj_bound, status = (solution.get(k, "-") for k in keys)
+            obj_vals, obj_bounds, solved_iters, iter_runtimes, loop_runtimes, best_idx = (solution.get('iter_results').get(k, "-") for k in keys_iter)
 
             # Optimal portifolio
             portifolio = [assets[i] for i in selected_idx]
@@ -76,31 +79,30 @@ class Results:
                 solved_iters_percentage = sum(solved_iters) / len(solved_iters) * 100
 
                 # Unsolved cases
-                unsolved_idx = [idx for idx, val in enumerate(solved_iters) if not val]
-                unsolved_cases = [idx+1 for idx in unsolved_idx]
+                unsolved_idx = [idx+1 for idx, value in enumerate(solved_iters) if not value]
 
                 # Objective values of unsolved cases
-                obj_vals_unsolved = {idx+1: round(obj_vals[idx], 4) for idx in unsolved_idx}
+                obj_vals_unsolved = {idx: obj_vals[idx-1] for idx in unsolved_idx}
 
                 # Objective bounds of unsolved cases
-                obj_bounds_unsolved = {idx+1: round(obj_bounds[idx], 4) for idx in unsolved_idx}
+                obj_bounds_unsolved = {idx: obj_bounds[idx-1] for idx in unsolved_idx}
 
                 # Gaps of unsolved cases
                 gaps_unsolved = {
-                    idx: round(abs((obj_vals_unsolved[idx] - obj_bounds_unsolved[idx]) / (obj_vals_unsolved[idx]) * 100))
-                    for idx in obj_vals_unsolved if obj_vals_unsolved[idx] != "-"
+                    idx: round(abs((value - obj_bounds_unsolved[idx]) / obj_vals_unsolved[idx] * 100))
+                    for idx, value in obj_vals_unsolved.items() if isinstance(value, (int, float))
                 }
 
                 # Round values
-                obj_vals = [round(value, 4) if value != "-" else "-" for value in obj_vals]
-                obj_vals_unsolved = {key: round(value, 4) if value != "-" else "-" for key, value in obj_vals_unsolved.items()}
-                obj_bounds_unsolved = {key: round(value, 4) if value != "-" else "-" for key, value in obj_bounds_unsolved.items()}
+                obj_vals = round_array(obj_vals, 4)
+                obj_vals_unsolved = round_dict(obj_vals_unsolved, 4)
+                obj_bounds_unsolved = round_dict(obj_bounds_unsolved, 4)
 
                 # Append iteration warmstart result data
                 self.iters_data[k].append([
                     partition_name, obj_val, obj_vals, solved_iters_percentage,
-                    unsolved_cases, obj_vals_unsolved, obj_bounds_unsolved,
-                    gaps_unsolved, iter_runtimes, runtimes[k]
+                    unsolved_idx, obj_vals_unsolved, obj_bounds_unsolved,
+                    gaps_unsolved, iter_runtimes, loop_runtimes, runtimes[k]
                 ])
 
 

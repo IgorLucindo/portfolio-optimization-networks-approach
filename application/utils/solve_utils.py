@@ -145,11 +145,11 @@ def _solve(G, cliques, instance, config, flags, delta, callback, numOfselectedAs
 
 
     # Infeasible
-    if model.status in [3, 4] or model.SolCount == 0:
-        solution =  {'solved': True, 'obj_bound': model.ObjBound, 'status': 'Infeasible'}
+    if model.status in [3, 4]:
+        solution =  {'solved': True, 'obj_bound': model.ObjBound, 'status': 'Inf'}
     # Timed out
     elif model.status == 9:
-        solution = {'solved': False, 'obj_bound': model.ObjBound, 'status': 'Timed out'}
+        solution = {'solved': False, 'obj_bound': model.ObjBound, 'status': 'TL'}
         # If found solution
         if model.SolCount > 0:
             weights = {i: x[i].X for i in V}
@@ -161,7 +161,7 @@ def _solve(G, cliques, instance, config, flags, delta, callback, numOfselectedAs
     else:
         weights = {i: x[i].X for i in V}
         selected_idx = [i for i in V if y[i].X > 0.5]
-        solution = {'solved': True, 'x': weights, 'selected_idx': selected_idx, 'obj_val': model.ObjVal}
+        solution = {'solved': True, 'x': weights, 'selected_idx': selected_idx, 'obj_val': model.ObjVal, 'status': 'Optimal'}
 
     return solution
 
@@ -170,37 +170,53 @@ def _solve_iterative(G, cliques, instance, config, flags, delta, callback):
     """
     Solve the asset allocation problem using an iterative warm-start strategy
     """
-    solutions = []
     best_solution = {'obj_val': float('-inf')}
     upper_bounds = [0]
     max_num_of_assets = _solve_max_num_of_assets(G, config)
-    _timer = Timer()
+    solutions = [{} for _ in range(max_num_of_assets)]
+    time_limit = 300
+    _timer = Timer(time_limit)
 
     # Set config for iterations
     config_iter = config
-    config_iter['time_limit'] = 300
+    config_iter['time_limit'] = time_limit
 
     # Get upper bounds
     for k in range(2, max_num_of_assets+1):
         upper_bounds.append(_solve_ub(instance, config, k))
 
-    # Solve bottom-up
-    _timer.reset()
-    for k in range(1, max_num_of_assets+1):
-        # Solve iteration
-        if upper_bounds[k-1] < best_solution['obj_val']:
-            current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1]}
-        else:
-            current_solution = _solve(G, cliques, instance, config_iter, flags, delta, callback, k, best_solution)
-        _timer.mark()
+    while True:
+        # Solve bottom-up
+        _timer.reset()
 
-        # Update solutions and current best solution
-        solutions.append(current_solution)
-        best_solution = _get_best_solution(best_solution, current_solution, k)
-    _timer.update()
+        # Get previous solution
+        prev_solved_iters = best_solution.get('iter_results', {}).get('solved_iters', [])
 
-    # Update solution unsolved cases
-    solutions = _update_solutions(best_solution, solutions)
+        for k in range(1, max_num_of_assets+1):
+            # Skip if already solved
+            if solutions[k-1].get('solved'):
+                continue
+
+            # Solve iteration
+            if upper_bounds[k-1] < best_solution['obj_val']:
+                current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1], 'status': 'Inf-Ub'}
+            else:
+                current_solution = _solve(G, cliques, instance, config_iter, flags, delta, callback, k, best_solution)
+            _timer.mark()
+
+            # Update solutions and current best solution
+            solutions[k-1] = current_solution
+            best_solution = _get_best_solution(best_solution, current_solution, k)
+        _timer.update()
+
+        # Update solution unsolved cases
+        solutions = _update_solutions(best_solution, solutions)
+
+        break
+        # Stop if solved all, or if there is no improvement
+        solved_iters = [d['solved'] for d in solutions]
+        if all(solved_iters) or prev_solved_iters == solved_iters:
+            break
 
     # Solve unsolved cases
     # solution = _solve(G, cliques, instance, config, flags, delta, callback, solution=solution)
@@ -288,11 +304,15 @@ def _set_iter_results(solution, solutions, timer):
     """
     Set iteration warmstart results to solution
     """
-    solution['obj_vals'] = [d.get('obj_val', "-") for d in solutions]
-    solution['obj_bounds'] = [d.get('obj_bound', "-") for d in solutions]
-    solution['solved_iters'] = [d['solved'] for d in solutions]
-    solution['iter_runtimes'] = timer.instance_runtimes
-    solution['status'] = "-"
+    solution['iter_results'] = {
+        'obj_vals': [d.get('obj_val', d['status']) for d in solutions],
+        'obj_bounds': [d.get('obj_bound', "-") for d in solutions],
+        'solved_iters': [d['solved'] for d in solutions],
+        'iter_runtimes': timer.runtimes_list,
+        'loop_runtimes': timer.runtimes_sum,
+        'best_idx': solution['idx']
+    }
+    solution['status'] = "Optimal" if all(solution['iter_results']['solved_iters']) else "Unsolved"
 
     return solution
 
