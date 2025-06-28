@@ -174,12 +174,13 @@ def _solve_iterative(G, cliques, instance, config, flags, delta, callback):
     upper_bounds = [0]
     max_num_of_assets = _solve_max_num_of_assets(G, config)
     solutions = [{} for _ in range(max_num_of_assets)]
-    time_limit = 300
-    _timer = Timer(time_limit)
+    # time_limit = 300
+    # _timer = Timer(time_limit)
+    _timer = Timer()
 
     # Set config for iterations
     config_iter = config
-    config_iter['time_limit'] = time_limit
+    # config_iter['time_limit'] = time_limit
 
     # Get upper bounds
     for k in range(2, max_num_of_assets+1):
