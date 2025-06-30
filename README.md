@@ -1,6 +1,6 @@
-# Portifolio Optimization Networks Approach
+# Portfolio Optimization Networks Approach
 
-Application to obtain otimal portifolio regarding return and diversification.
+Application to obtain otimal portfolio regarding return and diversification.
 
 # Setup
 

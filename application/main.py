@@ -16,23 +16,37 @@ flags = {
 }
 
 # Set configuration
-config = {
+config1 = {
+    'idx': 1,
     'dataset_name': 'l',           # 'm' or 'l'
-    'assets': {'range': 500, '#partitions': 1},
+    'assets': {'range': 500, '#partitions': 10},
     # 'thresholds': [0.3, 0.4, 0.5, 0.6, 0.7],
     'thresholds': [0.4],
     # 'deltas': [0.55, 0.6, 0.65, 0.7, 0.75],
-    # 'deltas': [0.05],
     'deltas': [0.6],
-    # 'R_var': -0.01,
     'R_var': 0.01,
     'gamma': 0.05,
     'time_limit': 7200,
     'dist_constr': 'star',       # 'clique' or 'star'
-    'valid_day_constr': 'none',    # 'none', 'upfront' or 'callback'
+    'valid_day_constr': False,
     'delta_constr': 'inequality',   # 'equality' or 'inequality
     'iterative_warmstart': True
 }
+config2 = {
+    'idx': 2,
+    'dataset_name': 'l',           # 'm' or 'l'
+    'assets': {'range': 500, '#partitions': 1},
+    'thresholds': [0.4],
+    'deltas': [0.05],
+    'R_var': -0.01,
+    'gamma': 0.05,
+    'time_limit': 7200,
+    'dist_constr': 'star',       # 'clique' or 'star'
+    'valid_day_constr': False,
+    'delta_constr': 'inequality',   # 'equality' or 'inequality
+    'iterative_warmstart': True
+}
+config = config1
 
 
 def main():
@@ -47,6 +61,8 @@ def main():
     timer = Timer()
 
     for asset_type, partition_instances in instances.items():
+        results.set_data_row([asset_type])
+
         for partition_name, instance in partition_instances.items():
             for t in config['thresholds']:
                 # Create network power graph and get maximal cliques
@@ -54,25 +70,20 @@ def main():
                 cliques = [tuple(c) for c in nx.find_cliques(G2)]
 
                 for delta in config['deltas']:
-                    solutions = []
+                    # Solve optimal portfolio
                     timer.reset()
-                    # Solve optimal portifolio
-                    solutions.append(solve_max_return(G2, cliques, instance, config, flags, delta, callback=0))
+                    solution = solve_max_return(G2, cliques, instance, config, flags, delta)
                     timer.mark()
-                    # solutions.append(solve_max_return(G, cliques, instance, config, flags, delta, callback=1))
-                    # timer.mark()
-                    # solutions.append(solve_max_return(G, cliques, instance, config, flags, delta, callback=2))
-                    # timer.mark()
                     timer.update()
 
                     # Set results
-                    results.set_data(solutions, partition_name, t, delta, G, instance, timer.runtimes)
+                    results.set_data(solution, partition_name, t, delta, G, instance, timer.runtimes[0])
 
                 # Show graphs
                 show_graphs([G2], flags['plot'])
 
-        results.set_save_data(asset_type)
-    results.set_save_data_config(config)
+        results.set_data_row([])
+    results.set_data_config()
     
     # Print results
     results.print(timer.total_runtime)

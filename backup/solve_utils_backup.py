@@ -7,17 +7,17 @@ import math
 import os
 
 
-def solve_max_return(G, cliques, instance, config, flags, delta=0.65):
+def solve_max_return(G, cliques, instance, config, flags, delta=0.65, callback=0):
     """
     Solve for maximum mean return, different methods depending on config
     """
     if config['iterative_warmstart']:
-        return _solve_iterative(G, cliques, instance, config, flags, delta)
+        return _solve_iterative(G, cliques, instance, config, flags, delta, callback)
     else:
-        return _solve(G, cliques, instance, config, flags, delta)
+        return _solve(G, cliques, instance, config, flags, delta, callback)
 
 
-def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
+def _solve(G, cliques, instance, config, flags, delta, callback, numOfselectedAssets=0, solution={}):
     """
     Solve for maximum mean return
     """
@@ -36,7 +36,8 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
 
     # Create model
     model = gp.Model("Max_Return")
-    model.setParam('TimeLimit', opt_config.get('time_limit', config['time_limit']))
+    model.setParam('TimeLimit', config['time_limit'])
+    model.setParam(GRB.Param.LazyConstraints, callback >= 1)
     _save_log(model, flags['save_log'])
 
 
@@ -52,13 +53,12 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
 
 
     # Set warmstart
-    if opt_config.get('warmstart_solution').get('x'):
-        _solution = opt_config['warmstart_solution']
-        for i in _solution['selected_idx']:
-            x[i].Start = _solution['x'][i]
+    if 'x' in solution:
+        for i in solution['selected_idx']:
+            x[i].Start = solution['x'][i]
             y[i].Start = 1
-        model.addConstr(obj_fn >= _solution['obj_val'])
-        model.setParam(GRB.Param.BestBdStop, _solution['obj_val']-1e-6)
+        model.addConstr(obj_fn >= solution['obj_val'])
+        model.setParam(GRB.Param.BestBdStop, solution['obj_val']-1e-6)
 
 
     # Fixing
@@ -68,12 +68,13 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
             z[t].lb = 1
 
     # Add constraints
-    # c1: Enforce minimum daily portfolio return, less strict on "bad days" (z[t]=1)
-    model.addConstrs(
-        (gp.quicksum(daily_returns[t, i] * x[i] for i in V) >= R_var - (R_var - min_daily_return[t]) * z[t]
-        for t in T_range),
-        name="c1"
-    )
+    # c1: Enforce minimum daily portfolio return, less strict on "bad days" (z[t]=1), if not using callbacks.
+    if not callback:
+        model.addConstrs(
+            (gp.quicksum(daily_returns[t, i] * x[i] for i in V) >= R_var - (R_var - min_daily_return[t]) * z[t]
+            for t in T_range),
+            name="c1"
+        )
     # c2: Limit the proportion or count of "bad days" (days where portfolio return is below R_var).
     if config['delta_constr'] == 'inequality':
         model.addConstr(gp.quicksum(z[t] for t in T_range) / total_days <= delta, name="c2")
@@ -93,18 +94,55 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
     # c6: Asset weight x[i] is 0 if not selected (y[i]=0), and at most 1 if selected (y[i]=1).
     model.addConstrs((x[i] <= y[i] for i in V), name="c6")
     # c7: If 'valid_day_constr' is 'upfront', ensure on "good days" (z[t]=0) at least one selected asset met R_var.
-    if config['valid_day_constr']:
+    if config['valid_day_constr'] == 'upfront':
         model.addConstrs((gp.quicksum(y[i] for i in S[t]) >= 1 - z[t] for t in T_range), name="c7")
     # c8: If 'numOfselectedAssets' is specified (e.g., in iterative solver), fix the total number of selected assets.
-    if opt_config.get('fix_assets'):
-        k = opt_config['fix_assets']['num']
-        if opt_config['fix_assets']['constr'] == 'equality':
-            model.addConstr(gp.quicksum(y[i] for i in V) == k, name="c8")
-        else:
-            model.addConstr(gp.quicksum(y[i] for i in V) <= k, name="c8")
+    if numOfselectedAssets:
+        model.addConstr(gp.quicksum(y[i] for i in V) == numOfselectedAssets, name="c8")
+
+
+    # Define callback functions
+    def lazy_callback1(model, where):
+        if where != GRB.Callback.MIPSOL: return
+        
+        x_ = model.cbGetSolution(x)
+        z_ = model.cbGetSolution(z)
+
+        for t in T_range:
+            if z_[t] > 0.5 or sum(daily_returns[t, i] * x_[i] for i in V) >= R_var:
+                continue
+            model.cbLazy(gp.quicksum(daily_returns[t, i] * x[i] for i in V) >= R_var - (R_var - min_daily_return[t]) * z[t])
+            if config['valid_day_constr'] == 'callback':
+                model.cbLazy(gp.quicksum(y[i] for i in S[t]) >= 1 - z[t])
+
+    def lazy_callback2(model, where):
+        if where != GRB.Callback.MIPSOL: return
+
+        x_ = model.cbGetSolution(x)
+        y_ = model.cbGetSolution(y)
+        z_ = model.cbGetSolution(z)
+
+        S_sel = [i for i in V if y_[i] > 0.5]
+        S_not_sel = [i for i in V if y_[i] <= 0.5]
+
+        for t in T_range:
+            if z_[t] > 0.5 or sum(daily_returns[t, i] * x_[i] for i in V) >= R_var:
+                continue
+            if max([daily_returns[t, i] for i in S_sel]) < R_var:
+                model.cbLazy(gp.quicksum(y[i] for i in S_not_sel) >= 1 - z[t])
+            else:
+                model.cbLazy(gp.quicksum(daily_returns[t, i] * x[i] for i in V) >=
+                             R_var - (R_var - min_daily_return[t]) * z[t])
     
     # Solve
-    model.optimize()
+    match callback:
+        case 0:
+            model.optimize()
+        case 1:
+            model.optimize(lazy_callback1)
+        case 2:
+            model.optimize(lazy_callback2)
+
 
     # Infeasible
     if model.status in [3, 4, 15]:
@@ -129,68 +167,60 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
     return solution
 
 
-def _solve_iterative(G, cliques, instance, config, flags, delta):
+def _solve_iterative(G, cliques, instance, config, flags, delta, callback):
     """
     Solve the asset allocation problem using an iterative warm-start strategy
     """
-    # Set config for iterations
-    opt_config = {
-        'time_limit': 300,
-        'warmstart_solution': {},
-        'fix_assets': {'num': 1, 'constr': 'equality'}      # 'equality' or 'inequality'
-    }
-
-    # Set params
     best_solution = {'obj_val': float('-inf')}
+    upper_bounds = [0]
     max_num_of_assets = _solve_max_num_of_assets(G, config)
-    upper_bounds = [_solve_ub(instance, config, k) for k in range(1, max_num_of_assets+1)]
     solutions = [{} for _ in range(max_num_of_assets)]
-    _timer = Timer(opt_config['time_limit'])
+    prev_solved_iters = []
+    time_limit = 300
+    _timer = Timer(time_limit)
+    _timer = Timer()
 
-    # Solve bottom-up
-    _timer.reset()
-    for k in range(1, max_num_of_assets+1):
-        # Update config
-        opt_config['fix_assets']['num'] = k
-        opt_config['warmstart_solution'] = best_solution
+    # Set config for iterations
+    config_iter = config
+    config_iter['time_limit'] = time_limit
 
-        # Solve iteration
-        if upper_bounds[k-1] < best_solution['obj_val']:
-            current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1], 'status': 'Inf-Ub'}
-        else:
-            current_solution = _solve(G, cliques, instance, config, flags, delta, opt_config)
-        _timer.mark()
+    # Get upper bounds
+    for k in range(2, max_num_of_assets+1):
+        upper_bounds.append(_solve_ub(instance, config, k))
 
-        # Update solutions and current best solution
-        solutions[k-1] = current_solution
-        best_solution = _get_best_solution(best_solution, current_solution, k)
+    while True:
+        # Solve bottom-up
+        _timer.reset()
 
+        for k in range(1, max_num_of_assets+1):
+            # Skip if already solved
+            if solutions[k-1].get('solved'):
+                continue
 
-    # Update solution unsolved cases
-    solutions = _update_solutions(best_solution, solutions)
+            # Solve iteration
+            if upper_bounds[k-1] < best_solution['obj_val']:
+                current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1], 'status': 'Inf-Ub'}
+            else:
+                current_solution = _solve(G, cliques, instance, config_iter, flags, delta, callback, k, best_solution)
+            _timer.mark()
 
-    # Update config
-    opt_config['time_limit'] = 600
-    opt_config['fix_assets']['constr'] = 'inequality'
-    
-    # Solve bottom-up with more effort
-    for k in range(1, max_num_of_assets+1):
-        # Skip if already solved
-        if solutions[k-1]['solved']:
-            continue
+            # Update solutions and current best solution
+            solutions[k-1] = current_solution
+            best_solution = _get_best_solution(best_solution, current_solution, k)
+        _timer.update()
 
-        # Solve iteration
-        if upper_bounds[k-1] < best_solution['obj_val']:
-            current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1], 'status': 'Inf-Ub'}
-        else:
-            current_solution = _solve(G, cliques, instance, config, flags, delta, opt_config)
-        _timer.mark()
+        # Update solution unsolved cases
+        solutions = _update_solutions(best_solution, solutions)
 
-        # Update solutions and current best solution
-        solutions[k-1] = current_solution
-        best_solution = _get_best_solution(best_solution, current_solution, k)
-    _timer.update()
+        # break
+        # Stop if solved all, or if there is no improvement
+        solved_iters = [d['solved'] for d in solutions]
+        if all(solved_iters) or prev_solved_iters == solved_iters:
+            break
+        prev_solved_iters = solved_iters
 
+    # Solve unsolved cases
+    # solution = _solve(G, cliques, instance, config, flags, delta, callback, solution=solution)
 
     # Set iteration warmstart results to solution
     best_solution = _set_iter_results(best_solution, solutions, _timer)
@@ -277,9 +307,10 @@ def _set_iter_results(solution, solutions, timer):
     """
     solution['iter_results'] = {
         'obj_vals': [d.get('obj_val', d['status']) for d in solutions],
-        'obj_bounds': [d.get('obj_bound', d['status']) for d in solutions],
+        'obj_bounds': [d.get('obj_bound', "-") for d in solutions],
         'solved_iters': [d['solved'] for d in solutions],
         'iter_runtimes': timer.runtimes_list,
+        'loop_runtimes': timer.runtimes_sum,
         'best_idx': solution['idx']
     }
     solution['status'] = "Optimal" if all(solution['iter_results']['solved_iters']) else "Unsolved"

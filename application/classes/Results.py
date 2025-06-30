@@ -1,5 +1,4 @@
 from utils.calculation_utils import *
-from collections import defaultdict
 import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
@@ -16,131 +15,156 @@ class Results:
         self.flags = flags
         self.config = config
 
-        self.data = defaultdict(list)
-        self.iters_data = defaultdict(list)
-        self.save_data = []
-        self.save_iters_data = []
+        self.data = []
+        self.iters_data = []
+        self.ref_data = []
 
-        self.save_solution_collumns = [
-            "Partition", "Threshold", "Delta", "Density", "Portifolio",
-            "Expected Return", "Expected Return (Bound)", "Portifolio Variance",
+        self.solution_columns = [
+            "Partition", "Threshold", "Delta", "Density", "Portfolio",
+            "Expected Return", "Expected Return (Bound)", "Portfolio Variance",
             "Average Correlation", "Runtime (s)", "Status"
         ]
-        self.save_iters_collumns = [
-            "Partition", "Best ObjVal", "ObjVals", "#Solved Iterations (%)",
-            "Unsolved Cases", "ObjVals (unsolved)", "ObjBounds (unsolved)",
-            "Gaps (%) (unsolved)", "Runtimes (s)", "Loop Runtime (s)", "Total Runtime (s)"
+        self.iters_columns = [
+            "Partition", "Best ObjVal", "Ref ObjVal", "ObjVals",
+            "#Solved Iterations (%)", "Unsolved Cases", "ObjVals (unsolved)",
+            "ObjBounds (unsolved)", "Gaps (%) (unsolved)", "Runtimes (s)",
+            "Total Runtime (s)", "Ref Total Runtime (s)", "Ref Status"
         ]
         self.row_length = [
-            len(self.save_solution_collumns),
-            len(self.save_iters_collumns)
+            len(self.solution_columns),
+            len(self.iters_columns)
         ]
 
         # Create results folder
         self.path = "application/results/"
         os.makedirs(self.path, exist_ok=True)
 
+        # Get reference data
+        self.get_ref_data()
 
-    def set_data(self, solutions, partition_name, t, delta, G, instance, runtimes):
+    
+    def get_ref_data(self):
+        """
+        Get reference data for saving results
+        """
+        if not self.flags['save_results'] or not self.config['iterative_warmstart']:
+            return
+        
+        # Get file path
+        file_name = f"results_ref{self.config['idx']}.xlsx"
+        file_path = os.path.join("application/results/reference", file_name)
+
+        # Read the Excel file
+        df = pd.read_excel(file_path)
+
+        # Get subset of Excel file
+        subset = df.loc[1:, ['Portfolio', 'Expected Return', 'Runtime (s)', 'Status']]
+        mask = subset['Portfolio'].isna()
+        first_empty_index = mask.idxmax() if mask.any() else subset.index[-1] + 1
+        final_subset = subset.loc[:first_empty_index - 1]
+
+        # Convert to lists
+        portfolios = final_subset['Portfolio'].tolist()
+        objvals = final_subset['Expected Return'].tolist()
+        runtimes = final_subset['Runtime (s)'].tolist()
+        status = final_subset['Status'].tolist()
+
+        # Append to reference result data
+        for i in range(len(portfolios)):
+            self.ref_data.append([{portfolios[i][1]: round(objvals[i], 4)}, runtimes[i], status[i]])
+
+
+    def set_data(self, solution, partition_name, t, delta, G, instance, runtime):
         """
         Set data results
         """
         (assets, daily_returns, min_daily_return, mean_return,
          correlation_matrix, sigma, asset_pairs, total_days) = instance
 
-        for k, solution in enumerate(solutions):
-            keys = ['x', 'selected_idx', 'obj_val', 'obj_bound', 'status']
-            keys_iter = ['obj_vals', 'obj_bounds', 'solved_iters', 'iter_runtimes', 'loop_runtimes', 'best_idx']
-            x, selected_idx, obj_val, obj_bound, status = (solution.get(k, "-") for k in keys)
-            obj_vals, obj_bounds, solved_iters, iter_runtimes, loop_runtimes, best_idx = (solution.get('iter_results').get(k, "-") for k in keys_iter)
+        keys = ['x', 'selected_idx', 'obj_val', 'obj_bound', 'status']
+        keys_iter = ['obj_vals', 'obj_bounds', 'solved_iters', 'iter_runtimes', 'best_idx']
+        x, selected_idx, obj_val, obj_bound, status = (solution.get(k, "-") for k in keys)
+        obj_vals, obj_bounds, solved_iters, iter_runtimes, best_idx = (solution.get('iter_results').get(k, "-") for k in keys_iter)
 
-            # Optimal portifolio
-            portifolio = [assets[i] for i in selected_idx]
+        # Optimal portfolio
+        portfolio = [assets[i] for i in selected_idx]
 
-            # Portfolio variance
-            variance = sum(x[i] * sigma[i, j] * x[j] for i in G.nodes for j in G.nodes)
+        # Portfolio variance
+        variance = sum(x[i] * sigma[i, j] * x[j] for i in G.nodes for j in G.nodes)
 
-            # Average correlation
-            pairs = {(i, j) for idx, i in enumerate(selected_idx) for j in selected_idx[idx + 1:]}
-            avg_corr = np.mean([abs(correlation_matrix[i, j]) for i, j in pairs]) if pairs else 0
+        # Average correlation
+        pairs = {(i, j) for idx, i in enumerate(selected_idx) for j in selected_idx[idx + 1:]}
+        avg_corr = np.mean([abs(correlation_matrix[i, j]) for i, j in pairs]) if pairs else 0
 
-            # Append solution result data
-            self.data[k].append([
-                partition_name, t, delta, nx.density(G), {len(portifolio): portifolio},
-                obj_val, obj_bound, variance, avg_corr, runtimes[k], status
+        # Append solution result data
+        self.data.append([
+            partition_name, t, delta, nx.density(G), {len(portfolio): portfolio},
+            obj_val, obj_bound, variance, avg_corr, runtime, status
+        ])
+
+        # --- Iteration warmstart method ---
+        if self.config['iterative_warmstart']:
+            # Best objective value
+            obj_val = {best_idx: round(obj_val, 4)}
+
+            # Solved cases percentage
+            solved_iters_percentage = sum(solved_iters) / len(solved_iters) * 100
+
+            # Unsolved cases
+            unsolved_idx = [idx+1 for idx, value in enumerate(solved_iters) if not value]
+
+            # Objective values of unsolved cases
+            obj_vals_unsolved = {idx: obj_vals[idx-1] for idx in unsolved_idx}
+
+            # Objective bounds of unsolved cases
+            obj_bounds_unsolved = {idx: obj_bounds[idx-1] for idx in unsolved_idx}
+
+            # Gaps of unsolved cases
+            gaps_unsolved = {
+                idx: round(abs((value - obj_bounds_unsolved[idx]) / obj_vals_unsolved[idx] * 100))
+                for idx, value in obj_vals_unsolved.items() if isinstance(value, (int, float))
+            }
+
+            # Round values
+            obj_vals = round_array(obj_vals, 4)
+            obj_vals_unsolved = round_dict(obj_vals_unsolved, 4)
+            obj_bounds_unsolved = round_dict(obj_bounds_unsolved, 4)
+
+            # Get data from reference
+            ref_objval, ref_runtime, ref_status = self.ref_data.pop(0)
+
+            # Append iteration warmstart result data
+            self.iters_data.append([
+                partition_name, obj_val, ref_objval, obj_vals,
+                solved_iters_percentage, unsolved_idx, obj_vals_unsolved,
+                obj_bounds_unsolved, gaps_unsolved, iter_runtimes, runtime,
+                ref_runtime, ref_status
             ])
 
-            # --- Iteration warmstart method ---
-            if self.config['iterative_warmstart']:
-                # Best objective value
-                obj_val = {best_idx: round(obj_val, 4)}
+            
+    def fill_row(self, _list, row_idx):
+        return (_list + [""] * self.row_length[row_idx])[:self.row_length[row_idx]]
+    
 
-                # Solved cases percentage
-                solved_iters_percentage = sum(solved_iters) / len(solved_iters) * 100
-
-                # Unsolved cases
-                unsolved_idx = [idx+1 for idx, value in enumerate(solved_iters) if not value]
-
-                # Objective values of unsolved cases
-                obj_vals_unsolved = {idx: obj_vals[idx-1] for idx in unsolved_idx}
-
-                # Objective bounds of unsolved cases
-                obj_bounds_unsolved = {idx: obj_bounds[idx-1] for idx in unsolved_idx}
-
-                # Gaps of unsolved cases
-                gaps_unsolved = {
-                    idx: round(abs((value - obj_bounds_unsolved[idx]) / obj_vals_unsolved[idx] * 100))
-                    for idx, value in obj_vals_unsolved.items() if isinstance(value, (int, float))
-                }
-
-                # Round values
-                obj_vals = round_array(obj_vals, 4)
-                obj_vals_unsolved = round_dict(obj_vals_unsolved, 4)
-                obj_bounds_unsolved = round_dict(obj_bounds_unsolved, 4)
-
-                # Append iteration warmstart result data
-                self.iters_data[k].append([
-                    partition_name, obj_val, obj_vals, solved_iters_percentage,
-                    unsolved_idx, obj_vals_unsolved, obj_bounds_unsolved,
-                    gaps_unsolved, iter_runtimes, loop_runtimes, runtimes[k]
-                ])
-
-
-    def set_save_data(self, asset_type):
+    def set_data_row(self, row):
         """
-        Set data results for saving
+        Set data row
         """
-        table_names = ["No Callback", "Callback 1", "Callback 2"]
-        
-        self.save_data.append(self.fill_row([asset_type], 0))
-        self.save_iters_data.append(self.fill_row([asset_type], 1))
-
-        for k in self.data.keys():
-            self.save_data.append(self.fill_row([table_names[k]], 0))
-            self.save_data.extend(self.data[k])
-            self.save_iters_data.append(self.fill_row([table_names[k]], 1))
-            self.save_iters_data.extend(self.iters_data[k])
-
-        # Reset data
-        self.data = defaultdict(list)
-        self.iters_data = defaultdict(list)
+        self.data.append(self.fill_row(row, 0))
+        self.iters_data.append(self.fill_row(row, 1))
 
 
-    def set_save_data_config(self, config):
+    def set_data_config(self):
         """
         Set configuration for saving
         """
         for _ in range(3):
-            self.save_data.append(self.fill_row([], 0))
-            self.save_iters_data.append(self.fill_row([], 1))
+            self.data.append(self.fill_row([], 0))
+            self.iters_data.append(self.fill_row([], 1))
 
-        for key, value in config.items():
-            self.save_data.append(self.fill_row([key, value], 0))
-            self.save_iters_data.append(self.fill_row([key, value], 1))
-
-
-    def fill_row(self, _list, row_idx):
-        return (_list + [""] * self.row_length[row_idx])[:self.row_length[row_idx]]
+        for key, value in self.config.items():
+            self.data.append(self.fill_row([key, value], 0))
+            self.iters_data.append(self.fill_row([key, value], 1))
 
 
     def print(self, total_runtime):
@@ -220,8 +244,8 @@ class Results:
             return
         
         # Create dataframe for exporting to xlsx file
-        df = pd.DataFrame(self.save_data, columns=self.save_solution_collumns)
-        df.to_excel(self.path + "results.xlsx", index=False)
+        df = pd.DataFrame(self.data, columns=self.solution_columns)
+        df.to_excel(self.path + f"results{self.config['idx']}.xlsx", index=False)
 
 
     def save_iters(self):
@@ -232,5 +256,5 @@ class Results:
             return
         
         # Create dataframe for exporting to xlsx file
-        df = pd.DataFrame(self.save_iters_data, columns=self.save_iters_collumns)
-        df.to_excel(self.path + "iters_results.xlsx", index=False)
+        df = pd.DataFrame(self.iters_data, columns=self.iters_columns)
+        df.to_excel(self.path + f"iters_results{self.config['idx']}.xlsx", index=False)
