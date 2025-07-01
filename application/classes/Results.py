@@ -25,7 +25,7 @@ class Results:
             "Average Correlation", "Runtime (s)", "Status"
         ]
         self.iters_columns = [
-            "Partition", "Best ObjVal", "Ref ObjVal", "ObjVals",
+            "Partition", "Best ObjVal", "Ref ObjVal", "Dif ObjVal (%)", "ObjVals",
             "#Solved Iterations (%)", "Unsolved Cases", "ObjVals (unsolved)",
             "ObjBounds (unsolved)", "Gaps (%) (unsolved)", "Runtimes (s)",
             "Total Runtime (s)", "Ref Total Runtime (s)", "Ref Status"
@@ -86,13 +86,9 @@ class Results:
         x, selected_idx, obj_val, obj_bound, status = (solution.get(k, "-") for k in keys)
         obj_vals, obj_bounds, solved_iters, iter_runtimes, best_idx = (solution.get('iter_results').get(k, "-") for k in keys_iter)
 
-        # Optimal portfolio
+        # Calculate data resutls
         portfolio = [assets[i] for i in selected_idx]
-
-        # Portfolio variance
         variance = sum(x[i] * sigma[i, j] * x[j] for i in G.nodes for j in G.nodes)
-
-        # Average correlation
         pairs = {(i, j) for idx, i in enumerate(selected_idx) for j in selected_idx[idx + 1:]}
         avg_corr = np.mean([abs(correlation_matrix[i, j]) for i, j in pairs]) if pairs else 0
 
@@ -104,38 +100,29 @@ class Results:
 
         # --- Iteration warmstart method ---
         if self.config['iterative_warmstart']:
-            # Best objective value
+            # Calculate data iter results
             obj_val = {best_idx: round(obj_val, 4)}
-
-            # Solved cases percentage
             solved_iters_percentage = sum(solved_iters) / len(solved_iters) * 100
-
-            # Unsolved cases
             unsolved_idx = [idx+1 for idx, value in enumerate(solved_iters) if not value]
-
-            # Objective values of unsolved cases
             obj_vals_unsolved = {idx: obj_vals[idx-1] for idx in unsolved_idx}
-
-            # Objective bounds of unsolved cases
             obj_bounds_unsolved = {idx: obj_bounds[idx-1] for idx in unsolved_idx}
-
-            # Gaps of unsolved cases
             gaps_unsolved = {
-                idx: round(abs((value - obj_bounds_unsolved[idx]) / obj_vals_unsolved[idx] * 100))
+                idx: round(abs((value - obj_bounds_unsolved[idx]) / obj_vals_unsolved[idx] * 100), 1)
                 for idx, value in obj_vals_unsolved.items() if isinstance(value, (int, float))
             }
+            ref_objval, ref_runtime, ref_status = self.ref_data.pop(0)
+            obj_val_value = list(obj_val.values())[0]
+            ref_obj_val_value = list(ref_objval.values())[0]
+            dif_objval = round((ref_obj_val_value - obj_val_value) / ref_obj_val_value * 100, 1)
 
             # Round values
             obj_vals = round_array(obj_vals, 4)
             obj_vals_unsolved = round_dict(obj_vals_unsolved, 4)
             obj_bounds_unsolved = round_dict(obj_bounds_unsolved, 4)
 
-            # Get data from reference
-            ref_objval, ref_runtime, ref_status = self.ref_data.pop(0)
-
             # Append iteration warmstart result data
             self.iters_data.append([
-                partition_name, obj_val, ref_objval, obj_vals,
+                partition_name, obj_val, ref_objval, dif_objval, obj_vals,
                 solved_iters_percentage, unsolved_idx, obj_vals_unsolved,
                 obj_bounds_unsolved, gaps_unsolved, iter_runtimes, runtime,
                 ref_runtime, ref_status

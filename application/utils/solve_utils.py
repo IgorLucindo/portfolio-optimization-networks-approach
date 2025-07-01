@@ -174,22 +174,22 @@ def _solve_iterative(G, cliques, instance, config, flags, delta):
     opt_config['fix_assets']['constr'] = 'inequality'
     
     # Solve bottom-up with more effort
-    for k in range(1, max_num_of_assets+1):
-        # Skip if already solved
-        if solutions[k-1]['solved']:
-            continue
+    # for k in range(1, max_num_of_assets+1):
+    #     # Skip if already solved
+    #     if solutions[k-1]['solved']:
+    #         continue
 
-        # Solve iteration
-        if upper_bounds[k-1] < best_solution['obj_val']:
-            current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1], 'status': 'Inf-Ub'}
-        else:
-            current_solution = _solve(G, cliques, instance, config, flags, delta, opt_config)
-        _timer.mark()
+    #     # Solve iteration
+    #     if upper_bounds[k-1] < best_solution['obj_val']:
+    #         current_solution = {'solved': True, 'obj_bound': upper_bounds[k-1], 'status': 'Inf-Ub'}
+    #     else:
+    #         current_solution = _solve(G, cliques, instance, config, flags, delta, opt_config)
+    #     _timer.mark()
 
-        # Update solutions and current best solution
-        solutions[k-1] = current_solution
-        best_solution = _get_best_solution(best_solution, current_solution, k)
-    _timer.update()
+    #     # Update solutions and current best solution
+    #     solutions[k-1] = current_solution
+    #     best_solution = _get_best_solution(best_solution, current_solution, k)
+    # _timer.update()
 
 
     # Set iteration warmstart results to solution
