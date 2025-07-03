@@ -84,7 +84,7 @@ class Results:
         keys = ['x', 'selected_idx', 'obj_val', 'obj_bound', 'status']
         keys_iter = ['obj_vals', 'obj_bounds', 'solved_iters', 'iter_runtimes', 'best_idx']
         x, selected_idx, obj_val, obj_bound, status = (solution.get(k, "-") for k in keys)
-        obj_vals, obj_bounds, solved_iters, iter_runtimes, best_idx = (solution.get('iter_results').get(k, "-") for k in keys_iter)
+        obj_vals, obj_bounds, solved_iters, iter_runtimes, best_idx = (solution.get('iter_results', {}).get(k, "-") for k in keys_iter)
 
         # Calculate data resutls
         portfolio = [assets[i] for i in selected_idx]

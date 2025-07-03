@@ -31,8 +31,13 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
 
 
     # Rounding for testing
-    mean_return = [round(mean_return[i], 4) for i in V]
-    daily_returns = [[round(daily_returns[t, i], 4) for i in V] for t in T_range]
+    # mean_return = np.array([round(val, 5) for val in mean_return])
+    # daily_returns = np.array([[round(val, 5) for val in return_row] for return_row in daily_returns])
+    # min_daily_return = np.array([round(val, 5) for val in min_daily_return])
+    mean_return = np.array([val*1e4 for val in mean_return])
+    daily_returns = np.array([[val*1e4 for val in return_row] for return_row in daily_returns])
+    min_daily_return = np.array([val*1e4 for val in min_daily_return])
+    R_var *= 1e4
 
 
     # Create model
@@ -53,7 +58,7 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
 
 
     # Set warmstart
-    if opt_config.get('warmstart_solution').get('x'):
+    if opt_config.get('warmstart_solution', {}).get('x'):
         _solution = opt_config['warmstart_solution']
         for i in _solution['selected_idx']:
             x[i].Start = _solution['x'][i]
