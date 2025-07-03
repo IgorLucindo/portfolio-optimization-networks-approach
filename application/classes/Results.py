@@ -113,7 +113,7 @@ class Results:
             ref_objval, ref_runtime, ref_status = self.ref_data.pop(0)
             obj_val_value = list(obj_val.values())[0]
             ref_obj_val_value = list(ref_objval.values())[0]
-            dif_objval = round((ref_obj_val_value - obj_val_value) / ref_obj_val_value * 100, 1)
+            dif_objval = round((obj_val_value - ref_obj_val_value) / ref_obj_val_value * 100, 1)
 
             # Round values
             obj_vals = round_array(obj_vals, 4)
