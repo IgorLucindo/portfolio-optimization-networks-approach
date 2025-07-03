@@ -24,14 +24,15 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
     # Unpack instance data
     (assets, daily_returns, min_daily_return, mean_return,
      correlation_matrix, sigma, asset_pairs, total_days) = instance
-    
     R_var = config['R_var']
     gamma = config['gamma']
     V = G.nodes
     T_range = range(total_days)
 
-    # Precompute which assets meet return threshold on each day
-    S = {t: [i for i in V if daily_returns[t, i] >= R_var] for t in T_range}
+
+    # Rounding for testing
+    mean_return = [round(mean_return[i], 4) for i in V]
+    daily_returns = [[round(daily_returns[t, i], 4) for i in V] for t in T_range]
 
 
     # Create model
@@ -61,12 +62,6 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
         model.setParam(GRB.Param.BestBdStop, _solution['obj_val']-1e-6)
 
 
-    # Fixing
-    # Fix dates that weighted return cannot surpass R_var
-    for t in T_range:
-        if max(daily_returns[t]) < R_var:
-            z[t].lb = 1
-
     # Add constraints
     # c1: Enforce minimum daily portfolio return, less strict on "bad days" (z[t]=1)
     model.addConstrs(
@@ -94,6 +89,7 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
     model.addConstrs((x[i] <= y[i] for i in V), name="c6")
     # c7: If 'valid_day_constr' is 'upfront', ensure on "good days" (z[t]=0) at least one selected asset met R_var.
     if config['valid_day_constr']:
+        S = {t: [i for i in V if daily_returns[t, i] >= R_var] for t in T_range}
         model.addConstrs((gp.quicksum(y[i] for i in S[t]) >= 1 - z[t] for t in T_range), name="c7")
     # c8: If 'numOfselectedAssets' is specified (e.g., in iterative solver), fix the total number of selected assets.
     if opt_config.get('fix_assets'):
