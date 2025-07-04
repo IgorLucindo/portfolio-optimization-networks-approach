@@ -38,7 +38,7 @@ def get_config(idx):
             return {
                 'idx': 3,
                 'dataset_name': 'l',            # 'm' or 'l'
-                'assets': {'range': 500, '#partitions': 6},
+                'assets': {'range': 500, '#partitions': 1},
                 'thresholds': [0.4],
                 'deltas': [0.6],
                 'R_var': 0.01,

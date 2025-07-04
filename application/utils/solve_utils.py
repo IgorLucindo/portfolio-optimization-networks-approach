@@ -1,3 +1,4 @@
+from utils.calculation_utils import *
 from classes.Timer import *
 import gurobipy as gp
 from gurobipy import GRB
@@ -28,16 +29,6 @@ def _solve(G, cliques, instance, config, flags, delta, opt_config={}):
     gamma = config['gamma']
     V = G.nodes
     T_range = range(total_days)
-
-
-    # Rounding for testing
-    # mean_return = np.array([round(val, 5) for val in mean_return])
-    # daily_returns = np.array([[round(val, 5) for val in return_row] for return_row in daily_returns])
-    # min_daily_return = np.array([round(val, 5) for val in min_daily_return])
-    mean_return = np.array([val*1e4 for val in mean_return])
-    daily_returns = np.array([[val*1e4 for val in return_row] for return_row in daily_returns])
-    min_daily_return = np.array([val*1e4 for val in min_daily_return])
-    R_var *= 1e4
 
 
     # Create model

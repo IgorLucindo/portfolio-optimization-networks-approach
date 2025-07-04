@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def round_array(_array, round_number):
     return [round(value, round_number) if isinstance(value, (int, float)) else value for value in _array]
 

@@ -1,2 +1,8 @@
+iter procedure to test:
+    solve using gurobi for 10 min time limit (solution found with k assets, use solution to warmstart)
+    solve iterations starting from k going up-bottom, then bottom up (e.g. k->0, k->20), give 1min time limit (or another low value)
+
+
+
 Add to paper:
     Compare warmstart with first feasible solution of gurobi
